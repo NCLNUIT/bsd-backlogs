@@ -31,9 +31,20 @@ module BSDBacklogs
         backlog_field = CustomField.find_by_name('Backlog')
         backlog = self.custom_field_value(backlog_field.id)
 
-        #Make sure we actually have a backlog to deal with - should also check was_value!!!
+        dont_increment = false
+
+        #Make sure we actually have a backlog to deal with otherwise we may have wiped one out
         if backlog.blank?
-           return true
+           dont_increment = true
+        end
+
+        #Get all status ids which consititue an issue being open
+        statuses = IssueStatus.where( :is_closed => 0 )
+        status_ids = statuses.collect(&:id)
+
+        #Make sure we are not dealing with a closed issue, we don't want to do anything with closed issue backlog numbers
+        unless status_ids.include?(self.status_id)
+            dont_increment = true
         end
 
         #Convert back log to int and reload self
@@ -42,17 +53,20 @@ module BSDBacklogs
 
 	    issues = Issue.joins(:custom_values).where( :project_id => self.project_id, custom_values: { :custom_field_id => backlog_field.id } ).
 	        order("CAST(custom_values.value as UNSIGNED)").
-            all( :conditions => ["custom_values.value >= ?", 1]) #backlog
+            all( :conditions => ["custom_values.value >= ? AND status_id IN (?) AND issues.id != ?", 1, status_ids, self.id])
 
         start = 1
 	    issues.each do |issue|
-            if issue.id == self.id
-                next
-            end
 
             #If we are overriding an existing number push up numbers
-            if issue.custom_field_value(backlog_field.id).to_i == backlog
-               start += 1
+            if dont_increment == false and start == backlog
+               start = backlog + 1
+            end
+
+            #Pointless saving if we are saving back the same number
+            if issue.custom_field_value(backlog_field.id).to_i == start
+                start += 1
+                next
             end
 
             #Override the value
@@ -64,24 +78,39 @@ module BSDBacklogs
             start += 1
 	    end
 
-	    if backlog > start
+	    if dont_increment == false and backlog > start
             cf = CustomValue.where( :custom_field_id => backlog_field.id, :customized_id => self.id )
             cf.first.value = start
             cf.first.save
 	    end
 
         return true
+
       end
 
       def remove_backlog_issues
 
         backlog_field = CustomField.find_by_name('Backlog')
+        backlog = self.custom_field_value(backlog_field.id)
+
+        #Make sure we actually have a backlog to deal with - should also check was_value!!!
+        if backlog.blank?
+           return true
+        end
+
+        statuses = IssueStatus.where( :is_closed => 0 )
+        status_ids = statuses.collect(&:id)
+
+        #Make sure we are not dealing with a closed issue, we don't want to do anything with closed issue backlog numbers
+        unless status_ids.include?(self.status_id)
+            return true
+        end
 
 	    issues = Issue.joins(:custom_values).where( :project_id => self.project_id, custom_values: { :custom_field_id => backlog_field.id } ).
 	        order("CAST(custom_values.value as UNSIGNED)").
-            all( :conditions => ["custom_values.value >= ?", 1])
+            all( :conditions => ["custom_values.value >= ? AND status_id IN (?)", backlog, status_ids])
 
-        start = 1
+        start = backlog
 	    issues.each do |issue|
             #Reindex the value
             cf = CustomValue.where( :custom_field_id => backlog_field.id, :customized_id => issue.id )
