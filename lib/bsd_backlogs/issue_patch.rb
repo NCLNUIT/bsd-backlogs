@@ -91,13 +91,8 @@ module BSDBacklogs
       def remove_backlog_issues
 
         backlog_field = CustomField.find_by_name('Backlog')
-        backlog = self.custom_field_value(backlog_field.id)
 
-        #Make sure we actually have a backlog to deal with - should also check was_value!!!
-        if backlog.blank?
-           return true
-        end
-
+        #Open status definitions
         statuses = IssueStatus.where( :is_closed => 0 )
         status_ids = statuses.collect(&:id)
 
@@ -106,17 +101,18 @@ module BSDBacklogs
             return true
         end
 
+        #Our current backlog number is deleted at this point so we have to work from 1 unfortunately
 	    issues = Issue.joins(:custom_values).where( :project_id => self.project_id, custom_values: { :custom_field_id => backlog_field.id } ).
 	        order("CAST(custom_values.value as UNSIGNED)").
-            all( :conditions => ["custom_values.value >= ? AND status_id IN (?)", backlog, status_ids])
+            all( :conditions => ["custom_values.value >= ? AND status_id IN (?) AND issues.id != ?", 1, status_ids, self.id])
 
-        start = backlog
+        backlog = 1
 	    issues.each do |issue|
-            #Reindex the value
+	        #Could improve this with a join back to issue and lookup via project
             cf = CustomValue.where( :custom_field_id => backlog_field.id, :customized_id => issue.id )
-            cf.first.value = start
+            cf.first.value = backlog
             cf.first.save
-            start += 1
+            backlog += 1
 	    end
 
       end
