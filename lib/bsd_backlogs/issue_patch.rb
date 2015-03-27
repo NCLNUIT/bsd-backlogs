@@ -51,9 +51,9 @@ module BSDBacklogs
         backlog = backlog.to_i
         self.reload
 
-	    issues = Issue.joins(:custom_values).where( :project_id => self.project_id, custom_values: { :custom_field_id => backlog_field.id } ).
-	        order("CAST(custom_values.value as UNSIGNED)").
-            all( :conditions => ["custom_values.value >= ? AND status_id IN (?) AND issues.id != ?", 1, status_ids, self.id])
+	    issues = Issue.joins(:custom_values).
+	                where("custom_values.value >= ? AND status_id IN (?) AND issues.id != ? AND project_id = ? AND custom_field_id = ?", 1, status_ids, self.id, self.project_id, backlog_field.id).
+	                order("CAST(custom_values.value as UNSIGNED)")
 
         start = 1
 	    issues.each do |issue|
@@ -102,9 +102,9 @@ module BSDBacklogs
         end
 
         #Our current backlog number is deleted at this point so we have to work from 1 unfortunately
-	    issues = Issue.joins(:custom_values).where( :project_id => self.project_id, custom_values: { :custom_field_id => backlog_field.id } ).
-	        order("CAST(custom_values.value as UNSIGNED)").
-            all( :conditions => ["custom_values.value >= ? AND status_id IN (?) AND issues.id != ?", 1, status_ids, self.id])
+	    issues = Issue.joins(:custom_values).
+	                where("custom_values.value >= ? AND status_id IN (?) AND issues.id != ? AND project_id = ? AND custom_field_id = ?", 1, status_ids, self.id, self.project_id, backlog_field.id).
+	                order("CAST(custom_values.value as UNSIGNED)")
 
         backlog = 1
 	    issues.each do |issue|
