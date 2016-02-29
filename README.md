@@ -1,4 +1,4 @@
-# bsd-backlogs
+# redmine-backlogs
 
 A Redmine 3 compatible pluging which adds a unique backlog number to your Redmine issues on per project basis. 
 
